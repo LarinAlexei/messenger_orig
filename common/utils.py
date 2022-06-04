@@ -2,8 +2,10 @@
 
 import json
 from common.variables import MAX_PACKAGE_LENGTH, ENCODING
+from decos import logs
 
 
+@logs
 def get_message(client):
     # Принимаем сообщение в байтах
     encoded_response = client.recv(MAX_PACKAGE_LENGTH)
@@ -19,6 +21,7 @@ def get_message(client):
     raise ValueError
 
 
+@logs
 def send_message(sock, message):
     if not isinstance(message, dict):
         raise TypeError

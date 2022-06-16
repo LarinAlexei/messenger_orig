@@ -22,26 +22,58 @@ SERVER_LOGGER = logging.getLogger('server')
 
 
 @log
-def process_client_msg(msg, client, msg_list):
+def process_client_msg(message, client, msg_list, clients, names):
     try:
-        if not isinstance(msg, dict):
+        if not isinstance(message, dict):
             raise NonDictInputError
 
-        conditions = ACTION in msg and msg[ACTION] == PRESENCE and TIME in msg and USER in msg \
-                     and msg[USER][ACCOUNT_NAME] == 'Larin'
-        # Передано сообщение
-        msg_in_deque = ACTION in msg and msg[ACTION] == MESSAGE and TIME in msg and MESSAGE_TEXT in msg
-        # Если верно(True) то код 200
+        conditions = ACTION in message and message[ACTION] == PRESENCE and TIME in message and USER in message
         if conditions:
-            return {RESPONSE: 200}
-        elif msg_in_deque:
-            msg_list.append((msg[ACCOUNT_NAME], msg[MESSAGE_TEXT]))
+            if message[USER][ACCOUNT_NAME] not in names.keys():
+                names[message[USER][ACCOUNT_NAME]] = client
+                send_message(client, RESPONSE_200)
+            else:
+                response = RESPONSE_400
+                response[ERROR] = 'Такое имя уже существует'
+                send_message(client, response)
+                clients.remove(client)
+                client.close()
+            return
+            # Если это сообщение, то добавляем его в очередь сообщений.
+            # Ответ не требуется.
+        elif ACTION in message and message[ACTION] == MESSAGE and \
+                DESTINATION in message and TIME in message \
+                and SENDER in message and MESSAGE_TEXT in message:
+            msg_list.append(message)
+            return
+            # Если клиент выходит
+        elif ACTION in message and message[ACTION] == EXIT and ACCOUNT_NAME in message:
+            clients.remove(names[message[ACCOUNT_NAME]])
+            names[message[ACCOUNT_NAME]].close()
+            del names[message[ACCOUNT_NAME]]
             return
         else:
-            send_message(client, {RESPONSE: 400, ERROR: 'BAD request'})
+            response = RESPONSE_400
+            response[ERROR] = 'Некорректный запрос'
+            send_message(client, response)
             return
+
     except NonDictInputError as err:
         SERVER_LOGGER.error(err)
+
+
+@log
+def process_message(message, names, listen_socks):
+    if message[DESTINATION] in names and names[message[DESTINATION]] in listen_socks:
+        send_message(names[message[DESTINATION]], message)
+        SERVER_LOGGER.info(f'Отправлено от : {message[SENDER]}'
+                           f'доставлено : {message[DESTINATION]}')
+    elif message[DESTINATION] in names and names[message[DESTINATION]] not in listen_socks:
+        raise ConnectionError
+    else:
+        SERVER_LOGGER.error(
+            f'Пользователь {message[DESTINATION]} не зарегистрирован на сервере, '
+            f'отправка сообщения невозможна.')
 
 
 @log
@@ -54,8 +86,8 @@ def arg_parser():
     listen_port = namespace.p
 
     if not 1023 < listen_port < 65536:
-        LOGGER.critical(f'Запуск сервера с указанным портом {listen_port},'
-                        f'допустимые адреса 1024 по 65535')
+        SERVER_LOGGER.critical(f'Запуск сервера с указанным портом {listen_port},'
+                               f'допустимые адреса 1024 по 65535')
         sys.exit(1)
 
     return listen_address, listen_port
@@ -74,6 +106,9 @@ def main():
     clients = []
     messages = []
 
+    # Этот словарь, содержит имена пользователей и их сокеты
+    names = dict()
+
     # Слушаем порт
     transport.listen(MAX_CONNECTIONS)
     SERVER_LOGGER.info('Сервер запущен и находится в режиме ожидания')
@@ -83,7 +118,7 @@ def main():
         try:
             client, client_address = transport.accept()
         except OSError as err:
-            print(err.errno)  # The error number returns None because it's just a timeout
+            #    print(err.errno)  # The error number returns None because it's just a timeout
             pass
         else:
             SERVER_LOGGER.info(f'Установлено соединение с ПК {client_address}')
@@ -91,7 +126,7 @@ def main():
 
         recv_data_lst = []
         send_data_lst = []
-        err_lst = []
+
         # Проверяем наличие ждущих клиентов
         try:
             if clients:
@@ -104,28 +139,22 @@ def main():
         if recv_data_lst:
             for client_with_message in recv_data_lst:
                 try:
-                    process_client_msg(get_message(client_with_message), messages, client_with_message)
-                except:
+                    process_client_msg(get_message(client_with_message), messages,
+                                       client_with_message, clients, names)
+                except Exception:
                     SERVER_LOGGER.info(f'Клиент {client_with_message.getpeername()} '
                                        f'отключился от сервера')
                     clients.remove(client_with_message)
 
-        # Если есть сообщения для отправки и ожидающие клиенты, отправляем им сообщение
-        if messages and send_data_lst:
-            message = {
-                ACTION: MESSAGE,
-                SENDER: messages[0][0],
-                TIME: time.time(),
-                MESSAGE_TEXT: messages[0][1]
-            }
-            del messages[0]
-            for waiting_client in send_data_lst:
-                try:
-                    send_message(waiting_client, message)
-                except:
-                    SERVER_LOGGER.info(f'Клиент {waiting_client.getpeername()} отключился от сервера')
-                    waiting_client.close()
-                    clients.remove(waiting_client)
+        # Если есть сообщения то обрабатываем все сообщение
+        for i in messages:
+            try:
+                process_message(i, names, send_data_lst)
+            except Exception:
+                SERVER_LOGGER.info(f'Связь с клиентом с именем {i[DESTINATION]} была потеряна')
+                clients.remove(names[i[DESTINATION]])
+                del names[i[DESTINATION]]
+        messages.clear()
 
 
 if __name__ == '__main__':

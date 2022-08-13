@@ -5,6 +5,7 @@ import select
 import sys
 import socket
 import logging
+import threading
 # import logs.server_log_config
 from common.variables import *
 from common.utils import get_message, send_message
@@ -13,6 +14,7 @@ from decos import log
 import argparse
 from descriptors import Port
 from metaclasses import ServerMaker
+from server_database import ServerStorage
 
 # Инициализация серверного логгера
 SERVER_LOGGER = logging.getLogger('server')
@@ -32,10 +34,10 @@ def arg_parser():
 
 
 # Классы сервера
-class Server(metaclass=ServerMaker):
+class Server(threading.Thread, metaclass=ServerMaker):
     port = Port()
 
-    def __init__(self, listen_address, listen_port):
+    def __init__(self, listen_address, listen_port, database):
         # Параметры подключения
         self.addr = listen_address
         self.port = listen_port
@@ -49,7 +51,14 @@ class Server(metaclass=ServerMaker):
         # Словарь, содержащий сопоставленные имена и сокеты
         self.names = dict()
 
+        # Серверная база данных
+        self.database = database
+
+        # Пустой сокет во время запуска
         self.sock = None
+
+        # Коструктор предка
+        super().__init__()
 
     def init_socket(self):  # Инициализация сокета
         # Сохраняем событие
@@ -59,13 +68,13 @@ class Server(metaclass=ServerMaker):
             f'Если адрес не указан, принимаются соединения с любых адресов.')
         # Выполняем подготовку сокета
         transport = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        transport.bind((self.addr, self.port))
+        transport.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         transport.settimeout(0.5)
         # Слушаем сокет
         self.sock = transport
         self.sock.listen()
 
-    def main_loop(self):
+    def run(self):
         # Инициализацию сокета
         self.init_socket()
 
@@ -106,9 +115,9 @@ class Server(metaclass=ServerMaker):
             # Если есть сообщения, то обрабатываем каждое из сообщенияй
             for msg in self.messages:
                 try:
-                    print('Вызов self.process_message: ', msg)
+                    #  print('Вызов self.process_message: ', msg)
                     self.process_message(msg, send_data_lst)
-                    print('Вызова self.process_message выполнен успешно!')
+                    #   print('Вызова self.process_message выполнен успешно!')
                 except:
                     SERVER_LOGGER.info(f'Связь с клиентом с именем {msg[DESTINATION]} была потеряна')
                     self.clients.remove(self.names[msg[DESTINATION]])
@@ -142,6 +151,10 @@ class Server(metaclass=ServerMaker):
             # иначе отправляем отказ.
             if message[USER][ACCOUNT_NAME] not in self.names.keys():
                 self.names[message[USER][ACCOUNT_NAME]] = client
+                # Работа с бд
+                client_ip, client_port = client.getpeername()
+                self.database.user_login(message[USER][ACCOUNT_NAME], client_ip, client_port)
+                # Отправляем сообщения
                 send_message(client, RESPONSE_200)
             else:
                 response = RESPONSE_400
@@ -157,7 +170,10 @@ class Server(metaclass=ServerMaker):
             return
         # Когда клиент вышел
         elif ACTION in message and message[ACTION] == EXIT and ACCOUNT_NAME in message:
-            self.clients.remove(self.names[ACCOUNT_NAME])
+            #   Выполнение метода logout в классе бд
+            self.database.user_logout(message[ACCOUNT_NAME])
+            #   Удаление клиента
+            self.clients.remove(self.names[message[ACCOUNT_NAME]])
             self.names[ACCOUNT_NAME].close()
             del self.names[ACCOUNT_NAME]
             return
@@ -168,6 +184,14 @@ class Server(metaclass=ServerMaker):
             send_message(client, response)
             return
 
+def help_print():
+    print('Поддерживаемые команды:')
+    print('users - список пользователей')
+    print('connected - список пользователей онлайн')
+    print('loglisthist - история входов')
+    print('exit - завершение работы')
+    print('help - вывод списка поддерживаемых команд')
+
 
 def main():
     """
@@ -176,8 +200,35 @@ def main():
     Далее функция запускает метод main_loop, отвечающий за инициализацию сокета.
     """
     listen_address, listen_port = arg_parser()
-    server = Server(listen_address, listen_port)
-    server.main_loop()
+
+    # Инициализация созданной базы данных
+    database = ServerStorage()
+
+    # Запускаем сервер
+    server = Server(listen_address, listen_port, database)
+    server.daemon = True
+    server.start()
+
+    # Основной цикл сервера
+    while True:
+        command = input('Введите Help или любую из команд: ')
+        if command == 'help':
+            help_print()
+        elif command == 'exit':
+            break
+        elif command == 'users':
+            for user in sorted(database.users_list()):
+                print(f'Пользователь {user[0]}, последний вход: {user[1]}')
+        elif command == 'connected':
+            for user in sorted(database.active_users_list())
+                print(f'Пользовтель {user[0]}, подключен: {user[1]}:{user[2]}, время установки соединения: {user[3]}')
+        elif command == 'loglisthist':
+            name = input('Введите имя пользователя для просмотра истории. '
+                         'Для вывода всей истории нажмите Enter: ')
+            for user in sorted(database.login_history(name)):
+                print(f'Пользователь: {user[0]} время входа: {user[1]}. Вход с: {user[2]}:{user[3]}')
+        else:
+            print('Такой команды нет!')
 
 
 if __name__ == '__main__':

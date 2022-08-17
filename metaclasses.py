@@ -1,15 +1,14 @@
 import dis
 
+
 # Метакласс для проверки соответствия сервера:
-from pprint import pprint
 
 
 class ServerMarket(type):
     def __int__(cls, clsname, bases, clsdict):
-        methods = []  # Получаем с помощью 'LOAD_GLOBAL'
-        methods_2 = []  # Получаем с помощью 'LOAD_METHOD'
-        attrs = []  # Получаем с помощью 'LOAD_ATTR'
-        # Производим перебор ключей
+        # Список методов, которые используются в функциях наших классов
+        methods = []
+        attrs = []  # Атрибуты, вызываемые функциями классов
         for func in clsdict:
             try:
                 ret = dis.get_instructions(clsdict[func])
@@ -17,26 +16,13 @@ class ServerMarket(type):
                 pass
             else:
                 for i in ret:
-                    print(i)
                     if i.opname == 'LOAD_GLOBAL':
                         if i.argval not in methods:  # Заполнение списка методами, используещиеся в классах
                             methods.append(i.argval)
-                    elif i.opname == 'LOAD_METHOD':
-                        if i.argval not in methods_2:
-                            # Заполнение списка атрибутами, используещиеся в классах
-                            methods_2.append(i.argval)
                     elif i.opname == 'LOAD_ATTR':
                         if i.argval not in attrs:
                             # Заполнение список атрибутами, используещиеся в классах
                             attrs.append(i.argval)
-                    print(20 * '-', 'methods', 20 * '-')
-                    pprint(methods)
-                    print(20 * '-', 'methods_2', 20 * '-')
-                    pprint(methods_2)
-                    print(20 * '-', 'attrs', 20 * '-')
-                    pprint(attrs)
-                    print(50 * '-')
-                    # При обнаружении недопустимого метода connect, вызывается исключение
                     if 'connect' in methods:
                         raise TypeError('Использование метода connect недопустимо в серверном классе')
                     # Если сокет не инициализировался SOCK_STREAM(TCP) AF_INET(IPv4), вызывается исключение

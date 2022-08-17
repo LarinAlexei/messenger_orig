@@ -1,4 +1,5 @@
 # Константы проекта
+import logging
 
 # Порт по умолчанию для сетевого взаимодействия
 DEFAULT_PORT = 7777
@@ -12,6 +13,10 @@ MAX_PACKAGE_LENGTH = 1024
 ENCODING = 'utf-8'
 # База данных для хранения данных
 SERVER_DATABASE = 'sqlite://server_base.db3'
+# Текущий уровень логирования
+LOGGING_LEVEL = logging.DEBUG
+# Хранение данных сервера
+SERVER_CONFIG = 'server_dist.ini'
 
 # Описание протокола JIM:
 ACTION = 'action'
@@ -28,10 +33,17 @@ ERROR = 'error'
 MESSAGE = 'message'
 MESSAGE_TEXT = 'mess_text'
 EXIT = 'exit'
+GET_CONTACTS = 'get_contacts'
+LIST_INFO = 'data_list'
+REMOVE_CONTACT = 'remove'
+ADD_CONTACT = 'add'
+USERS_REQUEST = 'get_users'
 
 # Ответы:
-# 200
-RESPONSE_200 = {RESPONSE: 200}
+# 202
+RESPONSE_202 = {RESPONSE: 202,
+                LIST_INFO:None
+                }
 # 400
 RESPONSE_400 = {
     RESPONSE: 400,

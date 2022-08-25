@@ -1,63 +1,77 @@
 # Клиент
-
-import socket
-import sys
-import json
-import time
 import logging
-import logs.client_log_config
+import logs.client_config_log
+import argparse
+import sys
+from PyQt5.QtWidgets import QApplication
 from common.variables import *
-from common.utils import get_message, send_message
-from errors import ReqFieldMissingError, IncorrectDataRecivedError, NonDictInputError
+from common.errors import ServerError
+from common.decos import log
+from client.database import ClientDatabase
+from client.transport import ClientTransport
+from client.main_window import ClientMainWindow
+from client.start_dialog import UserNameDialog  # ввод имени пользователя
+
+# Инициализация клиентского логера
+logger = logging.getLogger('client_dist')
 
 
-def create_presence(account_name='Larin'):
-    out_data = {
-        ACTION: PRESENCE,
-        TIME: time.time(),
-        USER: {
-            ACCOUNT_NAME: account_name
-        }
-    }
-    return out_data
+# Парсер аргументов командной строки
+@log
+def arg_parser():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('addr', default=DEFAULT_IP_address, nargs='?')
+    parser.add_argument('port', default=DEFAULT_PORT, type=int, nargs='?')
+    parser.add_argument('-n', '--name', default=None, nargs='?')
+    namespace = parser.parse_args(sys.argv[1:])
+    server_address = namespace.addr
+    server_port = namespace.port
+    client_name = namespace.name
+    # проверим подходящий номер порта
+    if not 1023 < server_port < 65536:
+        logger.critical(
+            f'Попытка запуска клиента с неподходящим номером порта: {server_port}. '
+            f'Допустимы адреса с 1024 до 65535. Клиент завершается.')
+        exit(1)
+    return server_address, server_port, client_name
 
 
-def process_ans(msg):
-    if RESPONSE in msg:
-        if msg[RESPONSE] == 200:
-            return '200 : OK'
-        return f'400 : {msg[ERROR]}'
-    raise ValueError
-
-
-def main():
-    try:
-        server_address = sys.argv[1]
-        server_port = int(sys.argv[2])
-        if server_port < 1024 or server_port > 65535:
-            raise ValueError
-    except IndexError:
-        CLIENT_LOGGER.info('Параметры сервера не указаны, но сервер запустится и применит все значения по умолчанию')
-        server_address = DEFAULT_IP_address
-        server_port = DEFAULT_PORT
-    except ValueError:
-        CLIENT_LOGGER.error(f'Попытка запуска клиента с недопускаемым номером порта: {server_port}.'
-                            f'(номер должен быть от 1024 до 65535)')
-        # print('Порт должен быть указан из диапазона от 1024 до 65535.')
-        sys.exit(1)
-
-    # Создание сокета и обмен
-    transport = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    transport.connect((server_address, server_port))
-    msg_to_server = create_presence()
-    send_message(transport, msg_to_server)
-
-    try:
-        answer = process_ans(get_message(transport))
-        print(answer)
-    except (ValueError, json.JSONDecodeError):
-        print('Сообщение сервера не удалось декодировать')
-
-
+# Основная функция клиента
 if __name__ == '__main__':
-    main()
+    # Загружаем параметы коммандной строки
+    server_address, server_port, client_name = arg_parser()
+    # Создаём клиентокое приложение
+    client_app = QApplication(sys.argv)
+    # Если имя пользователя не было указано в командной строке, то запросим его
+    if not client_name:
+        start_dialog = UserNameDialog()
+        client_app.exec_()
+        # Если пользователь ввёл имя и нажал ОК, то сохраняем ведённое и удаляем объект.
+        # Иначе - выходим
+        if start_dialog.ok_pressed:
+            client_name = start_dialog.client_name.text()
+            del start_dialog
+        else:
+            exit(0)
+    # Записываем логи
+    logger.info(
+        f'Запущен клиент с парамертами: адрес сервера: {server_address} , '
+        f'порт: {server_port}, имя пользователя: {client_name}')
+    # Создаём объект базы данных
+    database = ClientDatabase(client_name)
+    # Создаём объект - транспорт и запускаем транспортный поток
+    try:
+        transport = ClientTransport(server_port, server_address, database, client_name)
+    except ServerError as error:
+        print(error.text)
+        exit(1)
+    transport.setDaemon(True)
+    transport.start()
+    # Создаём GUI
+    main_window = ClientMainWindow(database, transport)
+    main_window.make_connection(transport)
+    main_window.setWindowTitle(f'Чат Программа alpha release - {client_name}')
+    client_app.exec_()
+    # Раз графическая оболочка закрылась, закрываем транспорт
+    transport.transport_shutdown()
+    transport.join()

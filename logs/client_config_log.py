@@ -1,22 +1,23 @@
 import logging
 
-# Создадим логер с именем 'client'
+
+# Создаем объект-логер с именем 'client'
 logger = logging.getLogger('client')
 
-# Форматирование
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+# Создаем объект форматирования:
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s ")
 # Создаем файловый обработчик логирования
-su = logging.FileHandler('logs/client.log', encoding='utf-8')
-su.setLevel(logging.DEBUG)
-su.setFormatter(formatter)
-# новый обработчик событий
-logger.addHandler(su)
+fh = logging.FileHandler("logs/client.log", encoding='utf-8')
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(formatter)
+# Добавляем в логгер новый обработчик событий и устанавливаем уровень логирования
+logger.addHandler(fh)
 logger.setLevel(logging.DEBUG)
 
 if __name__ == '__main__':
-    # Создадим потоковый обработчик
+    # Создаем потоковый обработчик логирования (по умолчанию sys.stderr):
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
     console.setFormatter(formatter)
     logger.addHandler(console)
-    logger.info('Тест')
+    logger.info('Тестовый запуск логирования')

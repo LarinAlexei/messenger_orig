@@ -4,7 +4,7 @@ import dis
 # Метакласс для проверки соответствия сервера:
 
 
-class ServerMarket(type):
+class ServerMarker(type):
     def __int__(cls, clsname, bases, clsdict):
         # Список методов, которые используются в функциях наших классов
         methods = []

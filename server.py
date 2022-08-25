@@ -15,7 +15,7 @@ from common.utils import get_message, send_message
 from decos import log
 import argparse
 from descriptors import Port, logger
-from metaclasses import ServerMaker
+from metaclasses import ServerMarker
 from server_database import ServerStorage
 from PyQt5.QtWidgets import QApplication, QMessageBox
 from PyQt5.QtCore import QTimer
@@ -44,7 +44,7 @@ def arg_parser(default_port, default_address):
 
 
 # Классы сервера
-class Server(threading.Thread, metaclass=ServerMaker):
+class Server(threading.Thread, metaclass=ServerMarker):
     port = Port()
 
     def __init__(self, listen_address, listen_port, database):
@@ -239,6 +239,22 @@ class Server(threading.Thread, metaclass=ServerMaker):
             return
 
 
+def config_load():
+    config = configparser.ConfigParser()
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    config.read(f"{dir_path}/{'server.ini'}")
+    # Если конфиг файл загружен правильно, запускаемся, иначе конфиг по умолчанию.
+    if 'SETTINGS' in config:
+        return config
+    else:
+        config.add_section('SETTINGS')
+        config.set('SETTINGS', 'Default_port', str(DEFAULT_PORT))
+        config.set('SETTINGS', 'Listen_Address', '')
+        config.set('SETTINGS', 'Database_path', '')
+        config.set('SETTINGS', 'Database_file', 'server_database.db3')
+        return config
+
+
 def help_print():
     print('Поддерживаемые команды:')
     print('users - список пользователей')
@@ -274,7 +290,10 @@ def main():
     )
 
     # Инициализация созданной базы данных
-    database = ServerStorage()
+    database = ServerStorage(
+        os.path.join(
+            config['SETTINGS']['Database_path'],
+            config['SETTINGS']['Database_file']))
 
     # Запускаем сервер
     server = Server(listen_address, listen_port, database)

@@ -8,22 +8,20 @@ DEFAULT_IP_address = '127.0.0.1'
 # Максимальная очередь подключений
 MAX_CONNECTIONS = 5
 # Максимальная длина сообщения в байтах
-MAX_PACKAGE_LENGTH = 1024
+MAX_PACKAGE_LENGTH = 10240
 # Кодировка проекта
 ENCODING = 'utf-8'
-# База данных для хранения данных
-SERVER_DATABASE = 'sqlite://server_base.db3'
 # Текущий уровень логирования
 LOGGING_LEVEL = logging.DEBUG
 # Хранение данных сервера
-SERVER_CONFIG = 'server_dist.ini'
+SERVER_CONFIG = 'server_dist+++.ini'
 
 # Описание протокола JIM:
 ACTION = 'action'
 TIME = 'time'
 USER = 'user'
 ACCOUNT_NAME = 'account_name'
-SENDER = 'sender'
+SENDER = 'from'
 DESTINATION = 'to'
 
 # Прочие ключи, используемые в протоколе
@@ -42,7 +40,7 @@ USERS_REQUEST = 'get_users'
 # Ответы:
 # 202
 RESPONSE_202 = {RESPONSE: 202,
-                LIST_INFO:None
+                LIST_INFO: None
                 }
 # 400
 RESPONSE_400 = {

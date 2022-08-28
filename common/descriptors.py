@@ -3,13 +3,14 @@ import sys
 
 logger = logging.getLogger('server')
 
-# Инициализация логера
-# Определение источника запуска
+
+# Инициализиция логера
+# метод определения модуля, источника запуска.
 if sys.argv[0].find('client_dist') == -1:
-    # Сервер
+    # если не клиент то сервер!
     logger = logging.getLogger('server_dist')
 else:
-    # Клиент
+    # ну, раз не сервер, то клиент
     logger = logging.getLogger('client_dist')
 
 
@@ -20,7 +21,6 @@ class Port:
             logger.critical(
                 f'Попытка запуска с указанием неподходящего порта {value}. Допустимы адреса с 1024 до 65535.')
             exit(1)
-
         instance.__dict__[self.name] = value
 
     def __set_name__(self, owner, name):

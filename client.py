@@ -3,11 +3,12 @@ import logging
 
 import RSA as RSA
 
-import logs.client_config_log
 import argparse
 import os
 import sys
-from PyQt5.QtWidgets import QApplication, QMessageBox
+
+from PyQt5.QtWidgets import QMessageBox, QApplication
+
 from common.variables import *
 from common.errors import ServerError
 from common.decos import log

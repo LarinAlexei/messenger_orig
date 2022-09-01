@@ -4,30 +4,30 @@ import subprocess
 
 
 def main():
-    PROCESSES = []
+    processes = []
 
     while True:
-        ACTION: str = input('Выберите действие: q - выход, '
+        action: str = input('Выберите действие: q - выход, '
                             's - запустить сервер и клиенты, k - запустим клиента, '
                             'x - закрыть все окна: ')
 
-        if ACTION == 'q':
+        if action == 'q':
             break
 
-        elif ACTION == 's':
+        elif action == 's':
             # Запускаем сервер
-            PROCESSES.append(subprocess.Popen('python server.py',
+            processes.append(subprocess.Popen('python server.py',
                                               creationflags=subprocess.CREATE_NEW_CONSOLE))
-        elif ACTION == 'k':
+        elif action == 'k':
             # Запускаем нужное количество клиентов
             clients_count = int(input('Введите количество тестовых клиентов для запуска: '))
             for i in range(clients_count):
-                PROCESSES.append(subprocess.Popen(f'python client.py -n test{i + 1} -p 123456',
+                processes.append(subprocess.Popen(f'python client.py -n test{i + 1} -p 123456',
                                                   creationflags=subprocess.CREATE_NEW_CONSOLE))
 
-        elif ACTION == 'x':
-            while PROCESSES:
-                PROCESSES.pop().kill()
+        elif action == 'x':
+            while processes:
+                processes.pop().kill()
 
 
 if __name__ == '__main__':

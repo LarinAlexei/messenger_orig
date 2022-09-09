@@ -1,0 +1,14 @@
+setup.py
+client/__init__.py
+client/common/__init__.py
+client/common/decos.py
+client/common/descriptors.py
+client/common/errors.py
+client/common/metaclasses.py
+client/common/utils.py
+client/common/variables.py
+my_very_best_mess_client.egg-info/PKG-INFO
+my_very_best_mess_client.egg-info/SOURCES.txt
+my_very_best_mess_client.egg-info/dependency_links.txt
+my_very_best_mess_client.egg-info/requires.txt
+my_very_best_mess_client.egg-info/top_level.txt
